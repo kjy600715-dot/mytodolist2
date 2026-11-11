@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="설치 없이 브라우저에서 쓰는 개인용 할 일 관리 앱">
+  <title>My Tasks</title>
+  <script>
+    // 첫 화면이 그려지기 전에 테마를 정해 깜빡임을 막는다.
+    (function () {
+      var theme = null;
+      try { theme = localStorage.getItem('todoTheme'); } catch (e) { /* 저장소 사용 불가 */ }
+      if (theme !== 'light' && theme !== 'dark') {
+        theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#todo-list">할 일 목록으로 건너뛰기</a>
+
+  <div class="storage-banner" id="storage-banner" role="alert" hidden>
+    <span id="storage-banner-text"></span>
+    <button type="button" class="banner-close" id="storage-banner-close" aria-label="알림 닫기">✕</button>
+  </div>
+
+  <main class="app">
+    <header class="app-header">
+      <div class="header-text">
+        <h1 class="app-title">My Tasks</h1>
+        <p class="remaining" id="remaining-count">남은 할 일 0개</p>
+      </div>
+      <button type="button" class="btn btn-ghost theme-toggle" id="theme-toggle" aria-pressed="false" title="테마 바꾸기 (Alt+D)">
+        <span class="theme-icon" aria-hidden="true">🌙</span><span class="theme-label">다크</span>
+      </button>
+    </header>
+
+    <figure class="quote" aria-label="오늘의 격언">
+      <blockquote id="quote-text"></blockquote>
+      <figcaption id="quote-author"></figcaption>
+    </figure>
+
+    <section class="stats" aria-labelledby="stats-title">
+      <h2 class="sr-only" id="stats-title">진행 현황</h2>
+      <div class="progress-summary">
+        <div class="progress-head">
+          <span class="progress-label">전체 진행률</span>
+          <strong class="progress-percent" id="progress-percent">0%</strong>
+        </div>
+        <div class="progress-track" id="progress-bar" role="progressbar" aria-label="전체 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <p class="progress-detail"><span id="progress-text">0/0 완료</span> · 오늘 추가 <strong id="today-count">0</strong>개</p>
+        <p class="cheer" id="cheer"></p>
+      </div>
+      <div class="cat-stats">
+        <div class="cat-stat" data-category="work">
+          <span class="cat-stat-name">업무</span>
+          <span class="cat-stat-count" data-role="count">0/0</span>
+          <div class="mini-track"><div class="mini-fill" data-role="fill"></div></div>
+        </div>
+        <div class="cat-stat" data-category="personal">
+          <span class="cat-stat-name">개인</span>
+          <span class="cat-stat-count" data-role="count">0/0</span>
+          <div class="mini-track"><div class="mini-fill" data-role="fill"></div></div>
+        </div>
+        <div class="cat-stat" data-category="study">
+          <span class="cat-stat-name">공부</span>
+          <span class="cat-stat-count" data-role="count">0/0</span>
+          <div class="mini-track"><div class="mini-fill" data-role="fill"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <nav class="filter-bar" id="filter-bar" aria-label="카테고리 필터">
+      <button type="button" class="filter-btn" data-filter="all" aria-pressed="true" title="Alt+1"><span class="filter-label">전체</span><span class="filter-count">0</span></button>
+      <button type="button" class="filter-btn" data-filter="work" aria-pressed="false" title="Alt+2"><span class="filter-label">업무</span><span class="filter-count">0</span></button>
+      <button type="button" class="filter-btn" data-filter="personal" aria-pressed="false" title="Alt+3"><span class="filter-label">개인</span><span class="filter-count">0</span></button>
+      <button type="button" class="filter-btn" data-filter="study" aria-pressed="false" title="Alt+4"><span class="filter-label">공부</span><span class="filter-count">0</span></button>
+    </nav>
+
+    <form class="todo-form" id="todo-form" autocomplete="off" novalidate>
+      <label class="sr-only" for="category-select">카테고리</label>
+      <select class="category-select" id="category-select">
+        <option value="work" selected>업무</option>
+        <option value="personal">개인</option>
+        <option value="study">공부</option>
+      </select>
+      <label class="sr-only" for="new-todo">새 할 일</label>
+      <input class="todo-input" id="new-todo" type="text" maxlength="200" placeholder="할 일을 입력하세요 (Alt+N)" aria-describedby="input-hint">
+      <button type="submit" class="btn btn-primary add-btn">추가</button>
+    </form>
+    <p class="input-hint" id="input-hint" aria-live="polite"></p>
+
+    <div class="toolbar">
+      <label class="sr-only" for="search">할 일 검색</label>
+      <input class="search-input" id="search" type="search" placeholder="🔍 검색">
+      <label class="sr-only" for="sort-select">정렬</label>
+      <select class="sort-select" id="sort-select">
+        <option value="status">완료 상태순</option>
+        <option value="manual">직접 정렬 (드래그)</option>
+        <option value="newest">생성일 최신순</option>
+        <option value="oldest">생성일 오래된순</option>
+        <option value="category">카테고리순</option>
+      </select>
+    </div>
+
+    <h2 class="list-heading" id="list-heading">할 일</h2>
+    <ul class="todo-list" id="todo-list" aria-labelledby="list-heading" tabindex="-1"></ul>
+    <p class="empty-state" id="empty-state" hidden></p>
+
+    <div class="list-actions" role="group" aria-label="목록 관리">
+      <button type="button" class="btn btn-secondary" id="undo-btn" title="Ctrl+Z">↶ 되돌리기</button>
+      <button type="button" class="btn btn-secondary" id="clear-completed-btn">완료 항목 삭제</button>
+      <button type="button" class="btn btn-secondary" id="export-btn">내보내기</button>
+      <button type="button" class="btn btn-secondary" id="import-btn">가져오기</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
+    </div>
+
+    <section class="shortcuts" aria-labelledby="shortcuts-title">
+      <h2 class="shortcuts-title" id="shortcuts-title">키보드 단축키</h2>
+      <dl class="shortcut-list">
+        <div><dt><kbd>Alt</kbd>+<kbd>N</kbd></dt><dd>입력창으로 이동</dd></div>
+        <div><dt><kbd>Alt</kbd>+<kbd>1</kbd>~<kbd>4</kbd></dt><dd>카테고리 필터</dd></div>
+        <div><dt><kbd>Alt</kbd>+<kbd>D</kbd></dt><dd>다크 모드</dd></div>
+        <div><dt><kbd>Ctrl</kbd>+<kbd>Z</kbd></dt><dd>삭제 되돌리기</dd></div>
+        <div><dt><kbd>↑</kbd>/<kbd>↓</kbd></dt><dd>손잡이에서 순서 바꾸기 (직접 정렬)</dd></div>
+        <div><dt>더블클릭</dt><dd>할 일 수정</dd></div>
+      </dl>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <span id="toast-text"></span>
+    <button type="button" class="toast-action" id="toast-action" hidden></button>
+  </div>
+  <div class="sr-only" id="announcer" aria-live="polite" aria-atomic="true"></div>
+
+  <dialog class="dialog" id="import-dialog" aria-labelledby="import-title">
+    <form method="dialog" class="dialog-form">
+      <h2 id="import-title">할 일 가져오기</h2>
+      <p id="import-summary"></p>
+      <fieldset>
+        <legend>가져오기 방식</legend>
+        <label class="choice"><input type="radio" name="import-mode" value="merge" checked> <span><strong>병합</strong> — 지금 목록에 없는 항목만 추가</span></label>
+        <label class="choice"><input type="radio" name="import-mode" value="replace"> <span><strong>대체</strong> — 지금 목록을 지우고 파일 내용으로 바꾸기</span></label>
+      </fieldset>
+      <label class="choice"><input type="checkbox" id="import-backup" checked> <span>가져오기 전에 지금 목록을 파일로 백업</span></label>
+      <div class="dialog-actions">
+        <button type="submit" class="btn btn-secondary" value="cancel">취소</button>
+        <button type="submit" class="btn btn-primary" value="confirm">가져오기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="todo-template">
+    <li class="todo-item">
+      <button type="button" class="drag-handle"><span aria-hidden="true">⠿</span></button>
+      <input type="checkbox" class="todo-check">
+      <div class="todo-body">
+        <span class="todo-text"></span>
+        <div class="todo-meta"><span class="cat-badge"></span><time class="todo-date"></time></div>
+      </div>
+      <div class="todo-actions">
+        <button type="button" class="icon-btn edit-btn" data-action="edit">수정</button>
+        <button type="button" class="icon-btn delete-btn" data-action="delete">삭제</button>
+      </div>
+    </li>
+  </template>
+
+  <script src="script.js"></script>
+</body>
+</html>
